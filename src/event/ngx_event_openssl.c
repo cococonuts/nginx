@@ -191,7 +191,8 @@ ngx_ssl_init(ngx_log_t *log)
 ngx_int_t
 ngx_ssl_create(ngx_ssl_t *ssl, ngx_uint_t protocols, void *data)
 {
-    ssl->ctx = SSL_CTX_new(SSLv23_method());
+    //Fix compiler error with Openssl 1.1.0, replace SSLv23_method with TLS_method
+    ssl->ctx = SSL_CTX_new(TLS_method());
 
     if (ssl->ctx == NULL) {
         ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0, "SSL_CTX_new() failed");
@@ -750,7 +751,8 @@ ngx_ssl_rsa512_key_callback(ngx_ssl_conn_t *ssl_conn, int is_export,
 #ifndef OPENSSL_NO_DEPRECATED
 
     if (key == NULL) {
-        key = RSA_generate_key(512, RSA_F4, NULL, NULL);
+	// Replace RSA_generate_key which is deprecated in Openssl 1.1.0
+        key = RSA_generate_key_ex(512, RSA_F4, NULL, NULL);
     }
 
 #endif
@@ -1159,11 +1161,11 @@ ngx_ssl_handshake(ngx_connection_t *c)
         c->send_chain = ngx_ssl_send_chain;
 
 #ifdef SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS
-
+	//Don't know how to fix it as there is no complete declaretion of struct ssl_st
         /* initial handshake done, disable renegotiation (CVE-2009-3555) */
-        if (c->ssl->connection->s3) {
-            c->ssl->connection->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS;
-        }
+        //if (c->ssl->connection->s3) {
+        //    c->ssl->connection->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS;
+        //}
 
 #endif
 
@@ -2861,7 +2863,8 @@ ngx_ssl_session_ticket_key_callback(ngx_ssl_conn_t *ssl_conn,
                        ngx_hex_dump(buf, key[0].name, 16) - buf, buf,
                        SSL_session_reused(ssl_conn) ? "reused" : "new");
 
-        RAND_pseudo_bytes(iv, 16);
+	// Replace RAND_pesuede_bytes which is deprecated in Openssl 1.1.0
+        RAND_bytes(iv, 16);
         EVP_EncryptInit_ex(ectx, EVP_aes_128_cbc(), NULL, key[0].aes_key, iv);
         HMAC_Init_ex(hctx, key[0].hmac_key, 16,
                      ngx_ssl_session_ticket_md(), NULL);
